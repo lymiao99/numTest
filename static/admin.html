@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>後台管理 - Supabase Realtime</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            background: #fafafa;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        table {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        th,
+        td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f8f8;
+            color: #666;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .danger {
+            color: #ff4747;
+            font-weight: bold;
+        }
+
+        .safe {
+            color: #3ecf8e;
+        }
+
+        .status-tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .bg-danger {
+            background: rgba(255, 71, 71, 0.1);
+        }
+
+        .bg-safe {
+            background: rgba(62, 207, 142, 0.1);
+        }
+
+        .realtime-indicator {
+            font-size: 0.8rem;
+            color: #3ecf8e;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>後台管理 (Realtime)</h1>
+        <div class="realtime-indicator">● Realtime 已啟動</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>數值</th>
+                <th>狀態</th>
+                <th>時間</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            <!-- 資料將即時更新 -->
+        </tbody>
+    </table>
+
+    <script>
+        // 注意：基於安全性，這裡我們使用從後端 API 獲取的環境變數（但在本範例中，您需要手動填入或由後端注入）
+        // 為了簡化，我們直接從全域變數讀取（部署時建議由後端生成包含金鑰的 JS 或使用 API）
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function loadInitialData() {
+            const response = await fetch('/api/numbers');
+            const data = await response.json();
+            renderTable(data, true);
+        }
+
+        function renderTable(rows, replace = false) {
+            const body = document.getElementById('tableBody');
+            if (replace) body.innerHTML = '';
+
+            rows.forEach(row => {
+                const isDanger = row.value >= 55;
+                const tr = document.createElement('tr');
+                tr.id = `row-${row.id}`;
+                tr.innerHTML = `
+                    <td>${row.id}</td>
+                    <td class="${isDanger ? 'danger' : 'safe'}">${row.value}</td>
+                    <td>
+                        <span class="status-tag ${isDanger ? 'danger bg-danger' : 'safe bg-safe'}">
+                            ${isDanger ? '危險' : '正常'}
+                        </span>
+                    </td>
+                    <td>${new Date(row.created_at).toLocaleString()}</td>
+                `;
+                if (replace) {
+                    body.appendChild(tr);
+                } else {
+                    body.insertBefore(tr, body.firstChild);
+                }
+            });
+        }
+
+        // 訂閱 Realtime 更新
+        function subscribeRealtime() {
+            supabase
+                .channel('numbers-db-changes')
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'numbers' },
+                    (payload) => {
+                        console.log('收到新資料:', payload.new);
+                        renderTable([payload.new]);
+                    }
+                )
+                .subscribe();
+        }
+
+        loadInitialData();
+        subscribeRealtime();
+    </script>
+</body>
+
+</html>
