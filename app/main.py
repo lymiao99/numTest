@@ -13,7 +13,15 @@ app = FastAPI(title="Supabase FastAPI App")
 
 # Supabase 設定
 URL: str = os.getenv("SUPABASE_URL")
-KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY") # 後端使用 Service Role Key 以跳過 RLS
+KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+if not URL or not KEY:
+    error_msg = f"Missing Supabase environment variables! URL: {'Found' if URL else 'MISSING'}, KEY: {'Found' if KEY else 'MISSING'}"
+    print(error_msg)
+    # 如果是本地開發環境 load_dotenv 應該會填入這些，若是 Render 則必須在控制台手動填入
+    if not URL: URL = "MISSING_URL"
+    if not KEY: KEY = "MISSING_KEY"
+
 supabase: Client = create_client(URL, KEY)
 
 # 定義資料格式
